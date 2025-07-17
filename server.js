@@ -18,13 +18,7 @@ app.use(cors(corsOptions));
 app.use("/", router);
 app.use('/api/sails', sailsRoutes);
 
-app.get('/metadata', (req, res) => {
-  const someMetadata = {
-    version: '1.0.0',
-    appName: 'My Awesome App'
-  };
-  res.status(200).json(someMetadata);
-});
+
 
 const port = config.get("port") || 3000;
 
