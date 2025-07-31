@@ -89,6 +89,12 @@ async function getAllBoatActivities() {
 }
 
 
+async function  getCustomerByPhoneNumber(phoneNumber) {
+    const sql = 'SELECT id, name, phone_number, email, notes FROM Customer WHERE phone_number = ?'
+    const [rows] = await pool.execute(sql, [phoneNumber]);
+    return rows.length > 0 ? rows[0] : null;
+}
+
 
 
 async function getUserByEmail(email) {
@@ -159,10 +165,7 @@ async function getUpcomingSailsData(startTime, endTime) {
     return results;
 }
 
-/**
- * מביא את כל השיוטים הפוטנציאליים בטווח זמן נתון, כולל חישוב התפוסה הנוכחית שלהם.
- * זוהי הפונקציה החדשה שנוספה מהענף השני.
- */
+
 async function findSailsWithOccupancy(searchParams) {
     try {
         const { date, time, population_type_id, activity_id } = searchParams;
@@ -172,7 +175,7 @@ async function findSailsWithOccupancy(searchParams) {
         const timeBeforeStr = new Date(timeBefore).toTimeString().slice(0, 8);
         const timeAfterStr = new Date(timeAfter).toTimeString().slice(0, 8);
 
-      
+
         const sql = `
             SELECT 
                 s.id AS sail_id, 
@@ -228,5 +231,8 @@ module.exports = {
 
     // הפלגות
     getUpcomingSailsData,
-    findSailsWithOccupancy 
+    findSailsWithOccupancy,
+
+    // לקוחות
+    getCustomerByPhoneNumber
 };

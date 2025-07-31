@@ -1,9 +1,8 @@
-const { checkAvailabilitySchema } = require('../schemas/booking.schema.js');
+const { checkAvailabilitySchema, israeliPhoneRegex } = require('../schemas/booking.schema.js');
 const { ZodError } = require('zod');
-const { findSailsWithOccupancy } = require('../storage/sql');
+const { findSailsWithOccupancy, getCustomerByPhoneNumber } = require('../storage/sql');
 
-
-
+//עזר
 function isSailAvailable(sail, newBooking) {
 
     const activity_capacity = sail.activity_capacity ?? Infinity;
@@ -93,6 +92,37 @@ const checkAvailability = async (req, res, next) => {
     }
 };
 
+const checkExistingCustomer = async (req, res) => {
+    const { phoneNumber } = req.query;
+
+    if (!phoneNumber) {
+        return res.status(400).json({ message: "The 'phoneNumber' query parameter is required." });
+    }
+
+    try {
+        const customer = await getCustomerByPhoneNumber(phoneNumber);
+
+        if (customer) {
+
+            const response = {
+                customer_id: customer.id.toString(),
+                name: customer.name,
+                phone_number: customer.phone_number,
+                email: customer.email,
+                notes: customer.notes
+            };
+            res.status(200).json(response);
+        } else {
+            res.status(404).json({ message: `Customer with phone number ${phoneNumber} not found.` });
+        }
+    } catch (error) {
+        console.error("Error in checkExistingCustomer:", error);
+        res.status(500).json({ message: "Internal Server Error." });
+    }
+}
+
+
 module.exports = {
     checkAvailability,
+    checkExistingCustomer,
 };
