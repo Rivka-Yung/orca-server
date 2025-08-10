@@ -19,9 +19,7 @@ app.use((req, res, next) => {
 
 app.use("/", router);
 
-console.log('2. [שרת ראשי]: עומד לטעון את הראוטר הראשי על נתיב /api');
 app.use("/api", router);
-console.log('3. [שרת ראשי]: הראוטר הראשי נטען בהצלחה על /api.');
 
 app.use('/api/sails', sailsRoutes); 
 
