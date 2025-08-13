@@ -12,5 +12,7 @@ router.post('/check-availability', bookingController.checkAvailability);
 
 router.get('/checkExistingCustomer', bookingController.checkExistingCustomer);
 
+router.post('/addCustomer', bookingController.addNewCustomer);
+
 
 module.exports = router;

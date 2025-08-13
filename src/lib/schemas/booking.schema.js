@@ -44,6 +44,33 @@ const checkAvailabilitySchema = z.object({
 });
 
 
+const addCustomerSchema = z.object({
+  
+    body: z.object({
+        name: z.string({
+            required_error: 'Name is a required field.'
+        }).min(2, { message: 'Name must be at least 2 characters long.' }),
+
+        phone_number: z.string({
+            required_error: 'Phone number is a required field.'
+        }).min(9, { message: 'Please provide a valid phone number.' }),
+
+        wants_whatsapp: z.boolean().optional().default(false),
+
+        email: z.string()
+                 .email({ message: 'Invalid email address.' })
+                 .optional()
+                 .nullable()
+                 .default(null), 
+
+        notes: z.string()
+               .optional()
+               .nullable()
+               .default(null) 
+    })
+});
+
 module.exports = {
   checkAvailabilitySchema,
+  addCustomerSchema,
 };

@@ -89,10 +89,27 @@ async function getAllBoatActivities() {
 }
 
 
-async function  getCustomerByPhoneNumber(phoneNumber) {
-    const sql = 'SELECT id, name, phone_number, email, notes FROM Customer WHERE phone_number = ?'
+async function getCustomerByPhoneNumber(phoneNumber) {
+    const sql = 'SELECT id, name, phone_number, email ,wants_whatsapp, notes FROM Customer WHERE phone_number = ?'
     const [rows] = await pool.execute(sql, [phoneNumber]);
     return rows.length > 0 ? rows[0] : null;
+}
+
+async function addCustomer(customerData) {
+    const sql = `
+        INSERT INTO Customer (name, phone_number, wants_whatsapp, email, notes)
+        VALUES (?, ?, ?, ?, ?)
+    `;
+    const values = [
+        customerData.name,
+        customerData.phone_number,
+        customerData.wants_whatsapp,
+        customerData.email,
+        customerData.notes
+    ];
+
+    const [result] = await pool.execute(sql, values);
+    return result;
 }
 
 
@@ -234,5 +251,6 @@ module.exports = {
     findSailsWithOccupancy,
 
     // לקוחות
-    getCustomerByPhoneNumber
+    getCustomerByPhoneNumber,
+    addCustomer
 };

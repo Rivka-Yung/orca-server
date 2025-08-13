@@ -1,6 +1,6 @@
-const { checkAvailabilitySchema, israeliPhoneRegex } = require('../schemas/booking.schema.js');
+const { checkAvailabilitySchema, addCustomerSchema } = require('../schemas/booking.schema.js');
 const { ZodError } = require('zod');
-const { findSailsWithOccupancy, getCustomerByPhoneNumber } = require('../storage/sql');
+const { findSailsWithOccupancy, getCustomerByPhoneNumber, addCustomer } = require('../storage/sql');
 
 //עזר
 function isSailAvailable(sail, newBooking) {
@@ -34,11 +34,10 @@ const checkAvailability = async (req, res, next) => {
 
         // אם אין שום שיוט זמין אחרי סינון, תשובה ריקה
         if (availableSails.length === 0) {
-            console.log("4. No available sails found after filtering. Exiting.");
             return res.status(200).json({ exactMatch: null, halfHourBefore: [], halfHourAfter: [] });
         }
 
-        // שלב 3: יישום החוק העסקי - "התאמה מדויקת תחילה
+        // שלב 3: חיפוש שיוטים שמתאימים בדיוק לשעה המבוקשת
         const exactMatchSail = availableSails.find(
             sail => sail.planned_start_time.slice(0, 5) === searchParams.time
         );
@@ -103,14 +102,15 @@ const checkExistingCustomer = async (req, res) => {
         const customer = await getCustomerByPhoneNumber(phoneNumber);
 
         if (customer) {
-
             const response = {
                 customer_id: customer.id.toString(),
                 name: customer.name,
                 phone_number: customer.phone_number,
                 email: customer.email,
+                whatsApp: customer.wants_whatsapp == 0 ? false : true,
                 notes: customer.notes
             };
+
             res.status(200).json(response);
         } else {
             res.status(404).json({ message: `Customer with phone number ${phoneNumber} not found.` });
@@ -122,7 +122,45 @@ const checkExistingCustomer = async (req, res) => {
 }
 
 
+
+const addNewCustomer = async (req, res) => {
+    try {
+     
+        const { body: validatedData } = addCustomerSchema.parse({
+            body: req.body
+        });
+
+
+        const result = await addCustomer(validatedData);
+
+        return res.status(201).json({
+            message: 'Customer added successfully',
+            customerId: result.insertId
+        });
+
+    } catch (error) {
+        if (error instanceof ZodError) {
+            return res.status(400).json({
+                message: 'Invalid input data',
+                errors: error.flatten().fieldErrors
+            });
+        }
+
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({
+                message: `A customer with the provided phone number already exists.`
+            });
+        }
+
+        console.error('Error in addCustomer controller:', error);
+        return res.status(500).json({
+            message: 'An internal server error occurred.'
+        });
+    }
+};
+
 module.exports = {
     checkAvailability,
     checkExistingCustomer,
+    addNewCustomer
 };

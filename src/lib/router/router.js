@@ -9,7 +9,7 @@ const authRouter = require('./authRouter');
 
 
 router.use('/metadata', metadataRouter);
-router.use('/bookings', bookingRouter);
+router.use('/booking', bookingRouter);
 router.use('/api/sails', sailsRouter);
 router.use('/auth', authRouter);
 
