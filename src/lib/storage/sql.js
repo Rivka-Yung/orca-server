@@ -104,8 +104,12 @@ async function getUpcomingSailsData(startTime, endTime) {
     return results;
 }
 
+
+
 /**
- * מביא פרטי שיוט בסיסיים לפי מזהה השיוט
+ * מביא פרטי שיוט בסיסיים לפי מזהה השיוט, כולל בדיקה דינמית לצורך במלווה נוסף.
+ * הפונקציה ממוטבת למהירות על ידי ביצוע כל הלוגיקה בשאילתת SQL יחידה.
+ * 
  * @param {number} sailId - מזהה השיוט
  * @returns {Promise<Object|null>} נתוני השיוט או null אם לא נמצא
  */
@@ -118,12 +122,34 @@ async function getSailById(sailId) {
             s.actual_start_time,
             s.end_time,
             s.is_private_group,
-            s.requires_orca_escort, -- השדה המקורי מהטבלה
+            s.requires_orca_escort, 
             s.notes,
             pt.name AS population_type,
             a.name AS boat_activity,
             b.name AS boat,
-            b.max_passengers AS boat_max_capacity -- הוספנו את קיבולת הסירה לחישובים
+            b.max_passengers AS boat_max_capacity,
+            
+            -- לוגיקה מאוחדת לחישוב הצורך במלווה נוסף.
+            (
+                -- תנאי 1: דריסה ידנית מהטבלה
+                s.requires_orca_escort
+                OR
+                -- תנאי 2: הפעילות היא אבובים או בננות
+                a.name IN ('אבובים', 'בננות')
+                OR
+                -- תנאי 3: אין אף מבוגר בהפלגה (כלומר, כולם מתחת לגיל 16)
+                (
+                    -- התנאי הזה יופעל רק אם קיימות הזמנות
+                    EXISTS (SELECT 1 FROM Booking bk WHERE bk.sail_id = s.id)
+                    AND
+                    -- והוא בודק שלא קיימת אפילו הזמנה אחת עם מבוגר
+                    NOT EXISTS (
+                        SELECT 1 FROM Booking bk 
+                        WHERE bk.sail_id = s.id AND bk.up_to_16_year = FALSE
+                    )
+                )
+            ) AS requires_orca_escort_2
+
         FROM Sail s
         LEFT JOIN PopulationType pt ON pt.id = s.population_type_id
         LEFT JOIN BoatActivity ba ON ba.id = s.boat_activity_id
@@ -133,7 +159,16 @@ async function getSailById(sailId) {
     `;
 
     const [sailResults] = await pool.execute(sailQuery, [sailId]);
-    return sailResults.length > 0 ? sailResults[0] : null;
+    
+    if (sailResults.length > 0) {
+        const sail = sailResults[0];
+        // המרת התוצאה הבוליאנית של MySQL (0 או 1) לערך בוליאני אמיתי של JavaScript
+        sail.requires_orca_escort = !!sail.requires_orca_escort;
+        sail.requires_orca_escort_2 = !!sail.requires_orca_escort_2;
+        return sail;
+    }
+
+    return null;
 }
 
 /**
