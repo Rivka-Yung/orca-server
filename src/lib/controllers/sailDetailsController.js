@@ -16,27 +16,24 @@ async function getSailById(req, res) {
         if (!sailData) {
             return res.status(404).json({ error: 'שיוט לא נמצא' });
         }
-
-        // --- התחלת לוגיקה עסקית ---
+        
         let totalPeopleActivity = 0;
         let totalPeopleJustSailing = 0;
-        let hasUnder16 = false;
 
         bookingsData.forEach(booking => {
             totalPeopleActivity += booking.num_people_activity || 0;
             totalPeopleJustSailing += booking.num_people_sail || 0;
-            if (booking.up_to_16_year) {
-                hasUnder16 = true;
-            }
         });
 
-        const requiresOrcaEscort = sailData.requires_orca_escort || hasUnder16;
         const totalPeopleOnBoat = totalPeopleActivity + totalPeopleJustSailing;
 
+        const requiresEscortResult = sailData.requires_orca_escort_2; 
+
         const capacityDetails = {
-            max_capacity: Math.max(0, sailData.boat_max_capacity || 0), // הוספתי הגנה מ-null
+            max_capacity: sailData.boat_max_capacity || 0,
             currently_occupied: totalPeopleOnBoat,
-            available_places: Math.max(0, (sailData.boat_max_capacity || 0) - totalPeopleOnBoat - (requiresOrcaEscort ? 1 : 0))
+            //חישוב המקומות הפנויים 
+            available_places: Math.max(0, (sailData.boat_max_capacity || 0) - totalPeopleOnBoat - (requiresEscortResult ? 1 : 0))
         };
         
         const response = {
@@ -48,7 +45,8 @@ async function getSailById(req, res) {
             population_type: sailData.population_type,
             is_private_group: sailData.is_private_group,
             boat_activity: sailData.boat_activity,
-            requires_orca_escort_2: requiresOrcaEscort,
+            requires_orca_escort_2: requiresEscortResult, 
+
             notes: sailData.notes,
             boat: sailData.boat,
             
@@ -69,8 +67,6 @@ async function getSailById(req, res) {
             ...capacityDetails
         };
         
-        console.log(`Sail Details for sail ${sailId} prepared successfully. Max capacity: ${capacityDetails.max_capacity}`);
-
         res.status(200).json(response);
                
     } catch (error) {

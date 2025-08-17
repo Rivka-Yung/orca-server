@@ -13,7 +13,6 @@ app.use(cors());
 app.use(express.json());
 
 app.use((req, res, next) => {
-    console.log(` בקשה התקבלה: ${req.method} לכתובת ${req.originalUrl}`);
     next(); // חשוב מאוד - ממשיך לבקשה הבאה
 });
 

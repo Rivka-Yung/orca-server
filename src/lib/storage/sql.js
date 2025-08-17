@@ -114,6 +114,7 @@ async function getUpcomingSailsData(startTime, endTime) {
  * @returns {Promise<Object|null>} נתוני השיוט או null אם לא נמצא
  */
 async function getSailById(sailId) {
+    
     const sailQuery = `
         SELECT 
             s.id AS sail_id,
