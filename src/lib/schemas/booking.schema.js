@@ -1,5 +1,6 @@
 const { z } = require('zod');
 
+// סכמה לבדיקת זמינות 
 const checkAvailabilitySchema = z.object({
   date: z.string({
     required_error: "The 'date' field is required.",
@@ -43,34 +44,79 @@ const checkAvailabilitySchema = z.object({
     .default(0),
 });
 
+// סכמת לקוח 
+const customerDataSchema = z.object({
+  name: z.string({
+    required_error: 'Name is a required field.'
+  }).min(2, { message: 'Name must be at least 2 characters long.' }),
+
+  phone_number: z.string({
+    required_error: 'Phone number is a required field.'
+  }).regex(/^05\d{8}$/, "Phone number must be 10 digits starting with 05"),
+
+  wants_whatsapp: z.boolean().optional().default(false),
+
+  email: z.string()
+    .email({ message: 'Invalid email address.' })
+    .optional()
+    .nullable()
+    .default(null),
+
+  notes: z.string()
+    .optional()
+    .nullable()
+    .default(null)
+});
+
 
 const addCustomerSchema = z.object({
-  
-    body: z.object({
-        name: z.string({
-            required_error: 'Name is a required field.'
-        }).min(2, { message: 'Name must be at least 2 characters long.' }),
+  body: customerDataSchema
+});
 
-        phone_number: z.string({
-            required_error: 'Phone number is a required field.'
-        }).min(9, { message: 'Please provide a valid phone number.' }),
 
-        wants_whatsapp: z.boolean().optional().default(false),
+const paymentSchema = z.object({
+    payment_type_id: z.number().int().positive(),
+    total: z.number().positive().optional(),
+    final_price: z.number().positive()
+});
 
-        email: z.string()
-                 .email({ message: 'Invalid email address.' })
-                 .optional()
-                 .nullable()
-                 .default(null), 
 
-        notes: z.string()
-               .optional()
-               .nullable()
-               .default(null) 
-    })
+// סכמה בסיסית שמשותפת לכל ההזמנות, עם שמות תואמי מסד נתונים
+const baseOrderSchema = z.object({
+    customer: customerDataSchema,
+    payment: paymentSchema,
+    num_people_activity: z.number().int().min(0),     
+    num_people_sail: z.number().int().min(0),         
+    is_phone_booking: z.boolean().optional().default(false), 
+    up_to_16_year: z.boolean().optional().default(false)    
+});
+
+
+
+const existingCruiseOrderSchema = baseOrderSchema.extend({
+    cruiseId: z.number().int().positive()
+});
+
+// סכמה עבור הזמנה עם יצירת הפלגה חדשה 
+const newCruiseOrderSchema = baseOrderSchema.extend({
+    sailDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    planned_start_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/), 
+    population_type_id: z.number().int().positive(),             
+    activityId: z.number().int().positive(),
+    is_private_group: z.boolean().optional(),                    
+    requires_orca_escort: z.boolean().optional()                  
+});
+
+
+const addOrderSchema = z.object({
+    body: z.union([
+        existingCruiseOrderSchema, 
+        newCruiseOrderSchema
+    ])
 });
 
 module.exports = {
   checkAvailabilitySchema,
   addCustomerSchema,
+  addOrderSchema,
 };

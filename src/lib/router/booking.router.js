@@ -14,5 +14,7 @@ router.get('/checkExistingCustomer', bookingController.checkExistingCustomer);
 
 router.post('/addCustomer', bookingController.addNewCustomer);
 
+router.post('/addOrder', bookingController.addNewOrder);
+
 
 module.exports = router;

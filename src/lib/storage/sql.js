@@ -45,6 +45,12 @@ async function getAllActivities() {
     return activities;
 }
 
+async function getAllPaymentTypes() {
+    const sql = 'SELECT id, name FROM PaymentType';
+    const [paymentTypes] = await pool.query(sql);
+    return paymentTypes;
+}
+
 async function getAllPopulationTypes() {
     const [populationTypes] = await pool.query('SELECT id, name FROM PopulationType');
     return populationTypes;
@@ -109,6 +115,90 @@ async function addCustomer(customerData) {
     ];
 
     const [result] = await pool.execute(sql, values);
+    return result;
+}
+
+
+
+async function getPaymentTypeId(methodName) {
+    const sql = 'SELECT id FROM PaymentType WHERE name = ?';
+
+    const types = await query(sql, [methodName]);
+
+    return (types && types.length > 0) ? types[0].id : null;
+}
+
+async function findSailByDetails(sailDetails) {
+    const { date, startTime, populationTypeId } = sailDetails;
+    const sql = 'SELECT id FROM Sail WHERE `date` = ? AND planned_start_time = ? AND population_type_id = ?';
+    const results = await query(sql, [date, startTime, populationTypeId]);
+
+    return (results && results.length > 0) ? results[0].id : null;
+}
+
+async function createNewSail(sailData) {
+    const {
+        date,
+        plannedStartTime,
+        populationTypeId,
+        isPrivateGroup,
+        boatActivityId,
+        requiresOrcaEscort
+    } = sailData;
+
+    const sql = `
+        INSERT INTO Sail (
+            \`date\`, planned_start_time, population_type_id, is_private_group, 
+            boat_activity_id, requires_orca_escort
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    `;
+
+    const params = [
+        date,
+        plannedStartTime,
+        populationTypeId,
+        isPrivateGroup,
+        boatActivityId,
+        requiresOrcaEscort
+    ];
+
+    const result = await query(sql, params);
+    return result;
+}
+
+// פונקציה להוספת הזמנה חדשה
+async function insertNewBooking(bookingData) {
+    const {
+        sail_id,
+        customer_id,
+        num_people_sail,
+        num_people_activity,
+        final_price,
+        payment_type_id,
+        is_phone_booking,
+        notes,
+        up_to_16_year
+    } = bookingData;
+
+    const sql = `
+        INSERT INTO Booking (
+            sail_id, customer_id, created_at, num_people_sail,
+            num_people_activity, final_price, payment_type_id,
+            is_phone_booking, notes, up_to_16_year
+        ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const params = [
+        sail_id,
+        customer_id,
+        num_people_sail,
+        num_people_activity,
+        final_price,
+        payment_type_id,
+        is_phone_booking,
+        notes,
+        up_to_16_year
+    ];
+    const result = await query(sql, params);
     return result;
 }
 
@@ -241,6 +331,7 @@ module.exports = {
     getAllBoats,
     getAllBoatsToMataData,
     getAllBoatActivities,
+    getAllPaymentTypes,
 
     // משתמשים
     getUserByEmail,
@@ -250,7 +341,12 @@ module.exports = {
     getUpcomingSailsData,
     findSailsWithOccupancy,
 
-    // לקוחות
+    // הזמנה חדשה
     getCustomerByPhoneNumber,
-    addCustomer
+    addCustomer,
+    getPaymentTypeId,
+    insertNewBooking,
+    findSailByDetails,
+    createNewSail,
+   
 };
