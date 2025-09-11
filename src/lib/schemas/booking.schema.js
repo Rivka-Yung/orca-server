@@ -103,6 +103,7 @@ const newCruiseOrderSchema = baseOrderSchema.extend({
     planned_start_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/), 
     population_type_id: z.number().int().positive(),             
     activityId: z.number().int().positive(),
+    boatId: z.number().int().positive(), 
     is_private_group: z.boolean().optional(),                    
     requires_orca_escort: z.boolean().optional()                  
 });

@@ -1,6 +1,6 @@
 const { checkAvailabilitySchema, addCustomerSchema, addOrderSchema } = require('../schemas/booking.schema.js');
 const { ZodError } = require('zod');
-const { findSailsWithOccupancy, getCustomerByPhoneNumber, addCustomer, getPaymentTypeId, insertNewBooking, findSailByDetails, createNewSail } = require('../storage/sql');
+const { findSailsWithOccupancy, getCustomerByPhoneNumber, addCustomer, insertNewBooking, findSailByDetails, createNewSail, createOrderInTransaction } = require('../storage/sql');
 
 //עזר
 function isSailAvailable(sail, newBooking) {
@@ -159,103 +159,123 @@ const addNewCustomer = async (req, res) => {
     }
 };
 
+
+
+// const addNewOrder = async (req, res) => {
+//     try {
+//         const { body: validatedData } = addOrderSchema.parse({
+//             body: req.body
+//         });
+
+//         const {
+//             customer,
+//             payment,
+//             num_people_activity,
+//             num_people_sail,
+//             is_phone_booking,
+//             up_to_16_year
+//         } = validatedData;
+
+//         let sailId;
+
+//         if ('cruiseId' in validatedData) {
+//             sailId = validatedData.cruiseId;
+//         } else {
+//             const {
+//                 sailDate,
+//                 planned_start_time,
+//                 population_type_id,
+//                 is_private_group,
+//                 requires_orca_escort,
+//                 activityId,
+//                 boatId // נניח שזה יגיע בעתיד
+//             } = validatedData;
+
+//             const existingSailId = await findSailByDetails({
+//                 date: sailDate,
+//                 startTime: planned_start_time,
+//                 populationTypeId: population_type_id
+//             });
+
+//             if (existingSailId) {
+//                 sailId = existingSailId;
+//             } else {
+//                 // נניח שיש לנו פונקציה למצוא את boat_activity_id
+//                 // const boat_activity_id = await findBoatActivityId(boatId, activityId);
+//                 // if (!boat_activity_id) { ... }
+
+//                 // כרגע נשתמש בערך קבוע לבדיקה
+//                 const boat_activity_id = 1;
+
+//                 // --- בניית newSailData עם שמות snake_case בלבד ---
+//                 const newSailData = {
+//                     date: sailDate,
+//                     planned_start_time,
+//                     population_type_id,
+//                     is_private_group,
+//                     requires_orca_escort,
+//                     boat_activity_id
+//                 };
+
+//                 const newSailResult = await createNewSail(newSailData);
+//                 sailId = newSailResult.insertId;
+//             }
+//         }
+
+//         let customerId;
+//         const existingCustomer = await getCustomerByPhoneNumber(customer.phone_number);
+//         if (existingCustomer) {
+//             customerId = existingCustomer.id;
+//         } else {
+//             const newCustomerResult = await addCustomer(customer);
+//             customerId = newCustomerResult.insertId;
+//         }
+
+//         const bookingToInsert = {
+//             sail_id: sailId,
+//             customer_id: customerId,
+//             num_people_sail: num_people_sail || 0,
+//             num_people_activity: num_people_activity || 0,
+//             final_price: payment.final_price,
+//             payment_type_id: payment.payment_type_id,
+//             is_phone_booking: is_phone_booking || false,
+//             notes: customer.notes || null,
+//             up_to_16_year: up_to_16_year || false
+//         };
+
+//         const result = await insertNewBooking(bookingToInsert);
+
+//         return res.status(201).json({
+//             message: 'Order added successfully',
+//             orderId: result.insertId
+//         });
+
+//     } catch (error) {
+//         if (error instanceof ZodError) {
+//             return res.status(400).json({
+//                 message: 'Invalid input data',
+//                 errors: error.flatten().fieldErrors
+//             });
+//         }
+//         if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+//             return res.status(404).json({
+//                 message: 'Referenced entity not found...',
+//                 errorDetails: error.sqlMessage
+//             });
+//         }
+//         console.error('Error in addNewOrder controller:', error);
+//         return res.status(500).json({ message: 'An internal server error occurred.' });
+//     }
+// };
+
 const addNewOrder = async (req, res) => {
     try {
-       
+
         const { body: validatedData } = addOrderSchema.parse({
             body: req.body
         });
 
-
-        const {
-            customer,
-            payment,
-            num_people_activity, 
-            num_people_sail,     
-            is_phone_booking,   
-            up_to_16_year    
-        } = validatedData;
-
-
-        let sailId;
-
-
-        if ('cruiseId' in validatedData) {
-            sailId = validatedData.cruiseId;
-        } else {
-
-            const { sailDate, plannedStartTime, populationTypeId, ...otherSailData } = validatedData;
-            const existingSailId = await findSailByDetails({
-                date: sailDate,
-                startTime: plannedStartTime,
-                populationTypeId: populationTypeId
-            });
-
-            if (existingSailId) {
-                sailId = existingSailId;
-            } else {
-                const newSailData = {
-                    date: sailDate,
-                    plannedStartTime: plannedStartTime,
-                    populationTypeId: populationTypeId,
-                    ...otherSailData
-                };
-                const newSailResult = await createNewSail(newSailData);
-                sailId = newSailResult.insertId;
-            }
-        }
-
-        // // 3. בדיקת זמינות קריטית
-        // const sailStatus = await getSailCapacityAndOccupancy(sailId);
-
-        // if (!sailStatus) {
-        //     return res.status(404).json({ message: "Sail not found. It may have been canceled." });
-        // }
-
-        // const requiredActivitySeats = participantsActivity || 0;
-        // const requiredBoatSeats = participantsBoat || 0;
-        // const availableActivitySeats = sailStatus.activity_capacity - sailStatus.current_activity_occupancy;
-        // const availableBoatSeats = sailStatus.sail_capacity - sailStatus.current_sail_occupancy;
-
-        // if (availableActivitySeats < requiredActivitySeats || availableBoatSeats < requiredBoatSeats) {
-        //     return res.status(409).json({
-        //         message: "Not enough space available on this sail.",
-        //         details: {
-        //             availableActivitySeats,
-        //             requiredActivitySeats,
-        //             availableBoatSeats,
-        //             requiredBoatSeats
-        //         }
-        //     });
-        // }
-
-  
-        let customerId;
-        const existingCustomer = await getCustomerByPhoneNumber(customer.phone_number);
-        if (existingCustomer) {
-            customerId = existingCustomer.id;
-        } else {
-            const newCustomerResult = await addCustomer(customer);
-            customerId = newCustomerResult.insertId;
-        }
-
-        // 5. בניית אובייקט ההזמנה עבור מסד הנתונים
-        // --- כאן מבצעים את ה"תרגום" לשמות העמודות ב-DB ---
-
-
-        const bookingToInsert = {
-            sail_id: sailId,
-            customer_id: customerId,
-            num_people_sail: num_people_sail || 0,
-            num_people_activity: num_people_activity || 0,
-            final_price: payment.final_price,
-            payment_type_id: payment.payment_type_id,
-            is_phone_booking: is_phone_booking || false,
-            notes: customer.notes || null, // חשוב: השתמש ב-null עבור DB
-            up_to_16_year: up_to_16_year || false
-        };
-     
-        const result = await insertNewBooking(bookingToInsert);
+        const result = await createOrderInTransaction(validatedData);
 
         return res.status(201).json({
             message: 'Order added successfully',
@@ -263,17 +283,30 @@ const addNewOrder = async (req, res) => {
         });
 
     } catch (error) {
+
         if (error instanceof ZodError) {
             return res.status(400).json({
                 message: 'Invalid input data',
                 errors: error.flatten().fieldErrors
             });
         }
-
         if (error.code === 'ER_NO_REFERENCED_ROW_2') {
             return res.status(404).json({
-                message: 'Referenced entity not found (e.g., cruiseId or paymentTypeId is invalid).',
+                message: 'Referenced entity not found (e.g., paymentTypeId is invalid).',
                 errorDetails: error.sqlMessage
+            });
+        }
+
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({
+                message: 'A customer with the provided phone number already exists.'
+            });
+        }
+
+        if (error.code === 'INVALID_BOAT_ACTIVITY_COMBO') {
+            return res.status(400).json({
+                message: 'Invalid input data',
+                errors: { _form: [error.message] }
             });
         }
 
