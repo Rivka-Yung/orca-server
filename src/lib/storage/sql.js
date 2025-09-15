@@ -214,7 +214,7 @@ async function createOrderInTransaction(orderData) {
             up_to_16_year
         } = orderData;
 
-       
+
         let sailId;
         if ('cruiseId' in orderData) {
             sailId = orderData.cruiseId;
@@ -247,6 +247,9 @@ async function createOrderInTransaction(orderData) {
                 sailId = newSailResult.insertId;
             }
         }
+
+        await checkAvailabilityAndLock(sailId, num_people_activity, num_people_sail, connection);
+
 
         // לוגיקת יצירת לקוח (אם נדרש)
         let customerId;
@@ -281,6 +284,49 @@ async function createOrderInTransaction(orderData) {
     } finally {
         connection.release();
     }
+}
+
+async function checkAvailabilityAndLock(sailId, numPeopleActivity, numPeopleSail, connection) {
+    const sql = `
+        SELECT 
+            b.max_passengers AS sail_capacity,
+            a.max_people_total AS activity_capacity,
+            COALESCE(SUM(bk.num_people_activity), 0) AS current_activity_occupancy,
+            COALESCE(SUM(bk.num_people_sail), 0) AS current_sail_occupancy
+        FROM Sail s
+        JOIN BoatActivity ba ON s.boat_activity_id = ba.id
+        JOIN Activity a ON ba.activity_id = a.id
+        JOIN Boat b ON ba.boat_id = b.id
+        LEFT JOIN Booking bk ON s.id = bk.sail_id
+        WHERE s.id = ?
+        GROUP BY s.id, b.max_passengers, a.max_people_total
+        FOR UPDATE; 
+    `;
+
+    const [status] = await query(sql, [sailId], connection);
+
+    if (!status) {
+        const error = new Error('Sail not found. It may have been canceled.');
+        error.code = 'SAIL_NOT_FOUND';
+        throw error;
+    }
+
+    const availableActivitySeats = (status.activity_capacity ?? Infinity) - status.current_activity_occupancy;
+    const availableSailSeats = (status.sail_capacity ?? Infinity) - status.current_sail_occupancy;
+
+    if (availableActivitySeats < numPeopleActivity || availableSailSeats < numPeopleSail) {
+        const error = new Error('Not enough space available on this sail.');
+        error.code = 'INSUFFICIENT_SEATS';
+        error.details = { 
+            availableActivitySeats,
+            requiredActivitySeats: numPeopleActivity,
+            availableSailSeats,
+            requiredSailSeats: numPeopleSail,
+        };
+        throw error;
+    }
+
+    return true; 
 }
 
 
@@ -365,6 +411,7 @@ async function findSailsWithOccupancy(searchParams) {
 // --- ייצוא כל הפונקציות ---
 
 module.exports = {
+    
     initializeDatabasePool,
     query,
     getAllActivities,
@@ -386,5 +433,5 @@ module.exports = {
     findSailByDetails,
     createNewSail,
     findBoatActivityId,
-    createOrderInTransaction, 
+    createOrderInTransaction,
 };

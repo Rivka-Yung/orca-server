@@ -1,47 +1,46 @@
 // File: src/lib/controllers/metadata.controller.js
 
-// שלב 1: איחוד כל ה-imports הנחוצים משני הענפים
 const {
-    getAllBoatsToMataData, 
+    getAllBoatsToMataData,
     getAllActivities,
-    getAllBoatActivities, 
+    getAllBoatActivities,
     getAllPermissions,
     getAllPopulationTypes,
     getAllPaymentTypes,
-    getAllRoles, 
+    getAllRoles,
 } = require('../storage/sql');
 
 
 
 async function fetchAllRawData() {
     try {
-       
+
         const [
             boats,
             activities,
             populationTypes,
             permissions,
-            boatActivities, 
-            paymentTypes,   
-            roles          
+            boatActivities,
+            paymentTypes,
+            roles
         ] = await Promise.all([
-            getAllBoatsToMataData(), 
-            getAllActivities(),      
+            getAllBoatsToMataData(),
+            getAllActivities(),
             getAllPopulationTypes(),
-            getAllPermissions(),     
-            getAllBoatActivities(),  
-            getAllPaymentTypes(),    
-            getAllRoles()            
+            getAllPermissions(),
+            getAllBoatActivities(),
+            getAllPaymentTypes(),
+            getAllRoles()
         ]);
 
-     
+
         return {
             boats,
             activities,
             populationTypes,
             permissions,
             boatActivities,
-            paymentTypes, 
+            paymentTypes,
             roles
         };
     } catch (error) {
@@ -71,11 +70,24 @@ const getMetadata = async (req, res) => {
 function transformRawDataToMetadata(rawData) {
     const { activities, boats, boatActivities, populationTypes, permissions, paymentTypes, roles } = rawData;
 
+    const boatOnlyActivity = activities.find(act => act.name === 'סירה');
+
+   
+    const boatPassengerPrice = boatOnlyActivity ? boatOnlyActivity.ticket_price : 0;
+    if (boatOnlyActivity === undefined) {
+        console.warn("Metadata warning: Activity with name 'סירה' not found. Boat passenger price will be 0.");
+    }
+
+
     const metadata = {
+
+
         activity_prices: activities.reduce((acc, activity) => {
             acc[activity.name] = activity.ticket_price;
             return acc;
         }, {}),
+
+        boat_passenger_price: boatPassengerPrice,
 
         boat_capacity: boats.reduce((acc, boat) => {
             acc[boat.name] = boat.max_passengers;

@@ -310,6 +310,16 @@ const addNewOrder = async (req, res) => {
             });
         }
 
+        if (error.code === 'INSUFFICIENT_SEATS') {
+            return res.status(409).json({ 
+                message: error.message,
+                details: error.details
+            });
+        }
+        if (error.code === 'SAIL_NOT_FOUND') {
+            return res.status(404).json({ message: error.message });
+        }
+
         console.error('Error in addNewOrder controller:', error);
         return res.status(500).json({ message: 'An internal server error occurred.' });
     }
