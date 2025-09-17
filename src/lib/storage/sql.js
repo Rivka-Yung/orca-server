@@ -285,22 +285,40 @@ async function createOrderInTransaction(orderData) {
         connection.release();
     }
 }
-
+// SELECT 
+//     b.max_passengers AS sail_capacity,
+//     a.max_people_total AS activity_capacity,
+//     COALESCE(SUM(bk.num_people_activity), 0) AS current_activity_occupancy,
+//     COALESCE(SUM(bk.num_people_sail), 0) AS current_sail_occupancy
+// FROM Sail s
+// JOIN BoatActivity ba ON s.boat_activity_id = ba.id
+// JOIN Activity a ON ba.activity_id = a.id
+// JOIN Boat b ON ba.boat_id = b.id
+// LEFT JOIN Booking bk ON s.id = bk.sail_id
+// WHERE s.id = ?
+// GROUP BY s.id, b.max_passengers, a.max_people_total
+// FOR UPDATE; 
 async function checkAvailabilityAndLock(sailId, numPeopleActivity, numPeopleSail, connection) {
     const sql = `
+       
         SELECT 
-            b.max_passengers AS sail_capacity,
-            a.max_people_total AS activity_capacity,
-            COALESCE(SUM(bk.num_people_activity), 0) AS current_activity_occupancy,
-            COALESCE(SUM(bk.num_people_sail), 0) AS current_sail_occupancy
-        FROM Sail s
-        JOIN BoatActivity ba ON s.boat_activity_id = ba.id
-        JOIN Activity a ON ba.activity_id = a.id
-        JOIN Boat b ON ba.boat_id = b.id
-        LEFT JOIN Booking bk ON s.id = bk.sail_id
-        WHERE s.id = ?
-        GROUP BY s.id, b.max_passengers, a.max_people_total
-        FOR UPDATE; 
+                s.id AS sail_id, 
+                s.planned_start_time,
+                b.max_passengers AS sail_capacity,
+                a.max_people_total AS activity_capacity,
+                a.name AS activity_name,
+                pt.name AS population_type_name,
+                COALESCE(SUM(bk.num_people_activity), 0) AS current_activity_occupancy,
+                COALESCE(SUM(bk.num_people_sail), 0) AS current_sail_occupancy,
+
+                -- --> התוספת כאן <--
+                -- חישוב מקומות פנויים בסירה
+                (b.max_passengers - COALESCE(SUM(bk.num_people_sail), 0)) AS available_sail_seats,
+                
+                -- חישוב מקומות פנויים בפעילות (עם טיפול במקרה של קיבולת אינסופית)
+                (IFNULL(a.max_people_total, 999) - COALESCE(SUM(bk.num_people_activity), 0)) AS available_activity_seats
+
+            FROM Sail AS s
     `;
 
     const [status] = await query(sql, [sailId], connection);
@@ -317,7 +335,7 @@ async function checkAvailabilityAndLock(sailId, numPeopleActivity, numPeopleSail
     if (availableActivitySeats < numPeopleActivity || availableSailSeats < numPeopleSail) {
         const error = new Error('Not enough space available on this sail.');
         error.code = 'INSUFFICIENT_SEATS';
-        error.details = { 
+        error.details = {
             availableActivitySeats,
             requiredActivitySeats: numPeopleActivity,
             availableSailSeats,
@@ -326,7 +344,7 @@ async function checkAvailabilityAndLock(sailId, numPeopleActivity, numPeopleSail
         throw error;
     }
 
-    return true; 
+    return true;
 }
 
 
@@ -388,30 +406,67 @@ async function findSailsWithOccupancy(searchParams) {
     const timeBeforeStr = new Date(timeBefore).toTimeString().slice(0, 8);
     const timeAfterStr = new Date(timeAfter).toTimeString().slice(0, 8);
 
+    //     const sql = `
+    //         SELECT 
+    //             s.id AS sail_id, s.planned_start_time, b.max_passengers AS sail_capacity,
+    //             a.max_people_total AS activity_capacity, a.name AS activity_name, pt.name AS population_type_name,
+    //             COALESCE(SUM(bk.num_people_activity), 0) AS current_activity_occupancy,
+    //             COALESCE(SUM(bk.num_people_sail), 0) AS current_sail_occupancy
+    //         FROM Sail AS s
+    //         JOIN BoatActivity AS ba ON s.boat_activity_id = ba.id
+    //         JOIN Activity AS a ON ba.activity_id = a.id
+    //         JOIN Boat AS b ON ba.boat_id = b.id
+    //         JOIN PopulationType AS pt ON s.population_type_id = pt.id
+    //         LEFT JOIN Booking AS bk ON s.id = bk.sail_id
+    //         WHERE 
+    //             s.date = ? AND s.population_type_id = ? AND a.id = ? AND s.planned_start_time BETWEEN ? AND ?
+    //         GROUP BY s.id, s.planned_start_time, b.max_passengers, a.max_people_total, a.name, pt.name;
+    //     `;
+    //     return await query(sql, [date, population_type_id, activity_id, timeBeforeStr, timeAfterStr]);
     const sql = `
-        SELECT 
-            s.id AS sail_id, s.planned_start_time, b.max_passengers AS sail_capacity,
-            a.max_people_total AS activity_capacity, a.name AS activity_name, pt.name AS population_type_name,
-            COALESCE(SUM(bk.num_people_activity), 0) AS current_activity_occupancy,
-            COALESCE(SUM(bk.num_people_sail), 0) AS current_sail_occupancy
-        FROM Sail AS s
-        JOIN BoatActivity AS ba ON s.boat_activity_id = ba.id
-        JOIN Activity AS a ON ba.activity_id = a.id
-        JOIN Boat AS b ON ba.boat_id = b.id
-        JOIN PopulationType AS pt ON s.population_type_id = pt.id
-        LEFT JOIN Booking AS bk ON s.id = bk.sail_id
-        WHERE 
-            s.date = ? AND s.population_type_id = ? AND a.id = ? AND s.planned_start_time BETWEEN ? AND ?
-        GROUP BY s.id, s.planned_start_time, b.max_passengers, a.max_people_total, a.name, pt.name;
-    `;
-    return await query(sql, [date, population_type_id, activity_id, timeBeforeStr, timeAfterStr]);
+            SELECT 
+                s.id AS sail_id, 
+                s.planned_start_time,
+                b.max_passengers AS sail_capacity,
+                a.max_people_total AS activity_capacity,
+                a.name AS activity_name,
+                pt.name AS population_type_name,
+                COALESCE(SUM(bk.num_people_activity), 0) AS current_activity_occupancy,
+                COALESCE(SUM(bk.num_people_sail), 0) AS current_sail_occupancy,
+                (b.max_passengers - COALESCE(SUM(bk.num_people_sail), 0)) AS available_sail_seats,
+                (IFNULL(a.max_people_total, 999) - COALESCE(SUM(bk.num_people_activity), 0)) AS available_activity_seats
+            FROM Sail AS s
+            JOIN BoatActivity AS ba ON s.boat_activity_id = ba.id
+            JOIN Activity AS a ON ba.activity_id = a.id
+            JOIN Boat AS b ON ba.boat_id = b.id
+            JOIN PopulationType AS pt ON s.population_type_id = pt.id
+            LEFT JOIN Booking AS bk ON s.id = bk.sail_id
+            WHERE 
+                s.date = ? 
+              AND s.population_type_id = ? 
+              AND a.id = ? 
+              AND s.planned_start_time BETWEEN ? AND ?
+            GROUP BY s.id, s.planned_start_time, b.max_passengers, a.max_people_total, a.name, pt.name;
+        `;
+
+    const [sailsFromDb] = await pool.query(sql, [date, population_type_id, activity_id, timeBeforeStr, timeAfterStr]);
+    const sails = sailsFromDb.map(sail => ({
+        ...sail,
+        sail_capacity: parseInt(sail.sail_capacity, 10),
+        activity_capacity: sail.activity_capacity ? parseInt(sail.activity_capacity, 10) : null,
+        current_activity_occupancy: parseInt(sail.current_activity_occupancy, 10),
+        current_sail_occupancy: parseInt(sail.current_sail_occupancy, 10),
+        available_sail_seats: parseInt(sail.available_sail_seats, 10),
+        available_activity_seats: parseInt(sail.available_activity_seats, 10)
+    }));
+    return sails;
 }
 
 
 // --- ייצוא כל הפונקציות ---
 
 module.exports = {
-    
+
     initializeDatabasePool,
     query,
     getAllActivities,

@@ -42,14 +42,20 @@ const checkAvailability = async (req, res, next) => {
             sail => sail.planned_start_time.slice(0, 5) === searchParams.time
         );
 
+        const mapSailToResponse = (sail) => ({
+            cruiseId: sail.sail_id,
+            time: sail.planned_start_time.slice(0, 5),
+            activityType: sail.activity_name,
+            populationType: sail.population_type_name,
+            available_sail_seats: sail.available_sail_seats,
+            available_activity_seats: sail.available_activity_seats,
+            current_sail_occupancy: sail.current_sail_occupancy,
+            current_activity_occupancy: sail.current_activity_occupancy
+        });
+
         if (exactMatchSail) {
             const response = {
-                exactMatch: {
-                    cruiseId: exactMatchSail.sail_id,
-                    time: exactMatchSail.planned_start_time.slice(0, 5),
-                    activityType: exactMatchSail.activity_name,
-                    populationType: exactMatchSail.population_type_name,
-                },
+                exactMatch: mapSailToResponse(exactMatchSail),
                 halfHourBefore: [],
                 halfHourAfter: [],
             };
@@ -59,21 +65,11 @@ const checkAvailability = async (req, res, next) => {
 
         const beforeSails = availableSails
             .filter(sail => sail.planned_start_time.slice(0, 5) < searchParams.time)
-            .map(sail => ({
-                cruiseId: sail.sail_id,
-                time: sail.planned_start_time.slice(0, 5),
-                activityType: sail.activity_name,
-                populationType: sail.population_type_name,
-            }));
+            .map(mapSailToResponse); 
 
         const afterSails = availableSails
             .filter(sail => sail.planned_start_time.slice(0, 5) > searchParams.time)
-            .map(sail => ({
-                cruiseId: sail.sail_id,
-                time: sail.planned_start_time.slice(0, 5),
-                activityType: sail.activity_name,
-                populationType: sail.population_type_name,
-            }));
+            .map(mapSailToResponse); 
 
         const response = {
             exactMatch: null,
@@ -311,7 +307,7 @@ const addNewOrder = async (req, res) => {
         }
 
         if (error.code === 'INSUFFICIENT_SEATS') {
-            return res.status(409).json({ 
+            return res.status(409).json({
                 message: error.message,
                 details: error.details
             });
