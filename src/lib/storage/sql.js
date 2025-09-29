@@ -302,24 +302,19 @@ async function checkAvailabilityAndLock(sailId, numPeopleActivity, numPeopleSail
     const sql = `
        
         SELECT 
-                s.id AS sail_id, 
-                s.planned_start_time,
-                b.max_passengers AS sail_capacity,
-                a.max_people_total AS activity_capacity,
-                a.name AS activity_name,
-                pt.name AS population_type_name,
-                COALESCE(SUM(bk.num_people_activity), 0) AS current_activity_occupancy,
-                COALESCE(SUM(bk.num_people_sail), 0) AS current_sail_occupancy,
-
-                -- --> התוספת כאן <--
-                -- חישוב מקומות פנויים בסירה
-                (b.max_passengers - COALESCE(SUM(bk.num_people_sail), 0)) AS available_sail_seats,
-                
-                -- חישוב מקומות פנויים בפעילות (עם טיפול במקרה של קיבולת אינסופית)
-                (IFNULL(a.max_people_total, 999) - COALESCE(SUM(bk.num_people_activity), 0)) AS available_activity_seats
-
-            FROM Sail AS s
-    `;
+            b.max_passengers AS sail_capacity,
+            a.max_people_total AS activity_capacity,
+            COALESCE(SUM(bk.num_people_activity), 0) AS current_activity_occupancy,
+            COALESCE(SUM(bk.num_people_sail), 0) AS current_sail_occupancy
+        FROM Sail s
+        JOIN BoatActivity ba ON s.boat_activity_id = ba.id
+        JOIN Activity a ON ba.activity_id = a.id
+        JOIN Boat b ON ba.boat_id = b.id
+        LEFT JOIN Booking bk ON s.id = bk.sail_id
+        WHERE s.id = ?
+        GROUP BY s.id, b.max_passengers, a.max_people_total
+        FOR UPDATE; 
+            `;
 
     const [status] = await query(sql, [sailId], connection);
 

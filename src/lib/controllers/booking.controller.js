@@ -12,10 +12,11 @@ function isSailAvailable(sail, newBooking) {
     const free_places_activity = activity_capacity - sail.current_activity_occupancy;
     const free_places_sail = sail_capacity - sail.current_sail_occupancy;
 
-    console.log(`Checking sail ${sail.sail_id}: 
-        Activity: ${activity_capacity} (capacity) - ${sail.current_activity_occupancy} (occupancy) >= ${newBooking.num_people_activity} (needed) -> ${free_places_activity >= newBooking.num_people_activity}
-        Sail: ${sail_capacity} (capacity) - ${sail.current_sail_occupancy} (occupancy) >= ${newBooking.num_people_sail} (needed) -> ${free_places_sail >= newBooking.num_people_sail}`);
-
+    // console.log(`Checking sail ${sail.sail_id}: 
+    //     Activity: ${activity_capacity} (capacity) - ${sail.current_activity_occupancy} (occupancy) >= ${newBooking.num_people_activity} (needed) -> ${free_places_activity >= newBooking.num_people_activity}
+    //     Sail: ${sail_capacity} (capacity) - ${sail.current_sail_occupancy} (occupancy) >= ${newBooking.num_people_sail} (needed) -> ${free_places_sail >= newBooking.num_people_sail}`);
+    // if (free_places_activity > free_places_sail)
+    //     free_places_activity = free_places_sail;
     return free_places_activity >= newBooking.num_people_activity && free_places_sail >= newBooking.num_people_sail;
 }
 
@@ -65,11 +66,11 @@ const checkAvailability = async (req, res, next) => {
 
         const beforeSails = availableSails
             .filter(sail => sail.planned_start_time.slice(0, 5) < searchParams.time)
-            .map(mapSailToResponse); 
+            .map(mapSailToResponse);
 
         const afterSails = availableSails
             .filter(sail => sail.planned_start_time.slice(0, 5) > searchParams.time)
-            .map(mapSailToResponse); 
+            .map(mapSailToResponse);
 
         const response = {
             exactMatch: null,
