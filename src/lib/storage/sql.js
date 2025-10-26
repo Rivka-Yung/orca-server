@@ -70,7 +70,7 @@ async function getAllPermissions() {
 }
 
 async function getAllBoats() {
-    const sql = 'SELECT id, name, id , is_active FROM Boat ORDER BY id';
+    const sql = 'SELECT id, name, is_active FROM Boat ORDER BY id';
     return await query(sql);
 }
 
@@ -357,6 +357,7 @@ async function getUserByEmail(email) {
     return rows.length > 0 ? rows[0] : null;
 }
 
+
 async function createUser(userData) {
     const sql = `
         INSERT INTO User (email, password, full_name, phone, role_id)
@@ -369,8 +370,14 @@ async function createUser(userData) {
         userData.phoneNumber,
         userData.roleId
     ];
-    const result = await query(sql, values);
-    return { id: result.insertId, ...userData };
+    const [result] = await pool.execute(sql, values);
+    return {
+        id: result.insertId,
+        email: userData.email,
+        full_name: userData.fullName,
+        phone: userData.phoneNumber,
+        role_id: userData.roleId
+    };
 }
 
 async function getUpcomingSailsData(startTime, endTime) {
@@ -458,12 +465,64 @@ async function findSailsWithOccupancy(searchParams) {
 }
 
 
+
+// יש להוסיף את הפונקציות האלה לקובץ שלך
+
+async function updateUserPassword(email, hashedPassword) {
+    console.log('updateUserPassword called with:', { email, hashedPasswordLength: hashedPassword?.length });
+    const sql = 'UPDATE User SET password = ? WHERE email = ?';
+    const [result] = await pool.execute(sql, [hashedPassword, email]);
+    console.log('Update result:', { affectedRows: result.affectedRows, changedRows: result.changedRows });
+    return result.affectedRows > 0;
+}
+
+async function updateUserDetails(email, userData) {
+    const sql = 'UPDATE User SET full_name = ?, phone = ? WHERE email = ?';
+    const [result] = await pool.execute(sql, [userData.fullName, userData.phone, email]);
+    return result.affectedRows > 0;
+}
+
+async function getSailById(sailId) {
+    const sailQuery = `
+        SELECT 
+            s.id AS sail_id, s.date, s.planned_start_time, s.actual_start_time, s.end_time,
+            s.is_private_group, s.requires_orca_escort, s.notes, pt.name AS population_type,
+            a.name AS boat_activity, b.name AS boat, b.max_passengers AS boat_max_capacity
+        FROM Sail s
+        LEFT JOIN PopulationType pt ON pt.id = s.population_type_id
+        LEFT JOIN BoatActivity ba ON ba.id = s.boat_activity_id
+        LEFT JOIN Activity a ON a.id = ba.activity_id
+        LEFT JOIN Boat b ON b.id = ba.boat_id
+        WHERE s.id = ?
+    `;
+    const [sailResults] = await pool.execute(sailQuery, [sailId]);
+    return sailResults.length > 0 ? sailResults[0] : null;
+}
+
+async function getBookingsBySailId(sailId) {
+    const bookingsQuery = `
+        SELECT 
+            bk.id AS booking_id, c.name, c.phone_number AS phone, bk.num_people_activity,
+            bk.num_people_sail, bk.final_price, bk.notes AS note, bk.up_to_16_year,
+            pt_payment.name AS payment_type
+        FROM Booking bk
+        LEFT JOIN Customer c ON c.id = bk.customer_id
+        LEFT JOIN PaymentType pt_payment ON pt_payment.id = bk.payment_type_id
+        WHERE bk.sail_id = ?
+        ORDER BY bk.id
+    `;
+    const [bookingsResults] = await pool.execute(bookingsQuery, [sailId]);
+    return bookingsResults;
+}
 // --- ייצוא כל הפונקציות ---
 
 module.exports = {
 
+    // פונקציות בסיס
     initializeDatabasePool,
     query,
+
+    // מטא-דאטה
     getAllActivities,
     getAllPopulationTypes,
     getAllPermissions,
@@ -472,10 +531,20 @@ module.exports = {
     getAllBoatsToMataData,
     getAllBoatActivities,
     getAllPaymentTypes,
+
+    // משתמשים (שילוב של שתי הגרסאות)
     getUserByEmail,
     createUser,
+    updateUserPassword,     // <<< חדש
+    updateUserDetails,      // <<< חדש
+
+    // הפלגות והזמנות
     getUpcomingSailsData,
     findSailsWithOccupancy,
+    getSailById,            // <<< חדש
+    getBookingsBySailId,    // <<< חדש
+
+    // תהליך יצירת הזמנה (מהקובץ שלך)
     getCustomerByPhoneNumber,
     addCustomer,
     getPaymentTypeId,

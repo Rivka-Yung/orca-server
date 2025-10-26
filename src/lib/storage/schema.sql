@@ -117,7 +117,7 @@ CREATE TABLE `User`(
     email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     role_id INT NOT NULL,
-    FOREIGN KEY (role_id) REFERENCES Roles(id)
+     FOREIGN KEY (role_id) REFERENCES Role(role_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
