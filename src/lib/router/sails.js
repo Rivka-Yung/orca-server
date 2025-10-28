@@ -7,9 +7,13 @@ const router = express.Router();
 const sailsService = require('../controllers/sailsService');
 const DetailsController = require('../controllers/sailDetailsController');
 
-module.exports = function(io) {
+module.exports = function (io) {
 
   // --- נתיבים כלליים לקבלת מידע על הפלגות ---
+  const attachIo = (req, res, next) => {
+    req.io = io; // מוסיפים את io לאובייקט req
+    next();
+  };
 
   router.get('/nextSail', async (req, res) => {
     try {
@@ -54,7 +58,7 @@ module.exports = function(io) {
     }
   });
 
-  router.post('/handleLateSails', async (req, res) => {
+  router.post('/handleLateSails',attachIo, async (req, res) => {
     try {
       const handledSails = await sailsService.handleLatePhoneSailsAutomatically(io);
       res.status(200).json({ message: 'Late sails processed', handledSails });
@@ -66,7 +70,7 @@ module.exports = function(io) {
 
   // --- נתיבים לביצוע פעולות על הפלגות ספציפיות ---
 
-  router.put('/updateStatus/:sailId', async (req, res) => {
+  router.put('/updateStatus/:sailId', attachIo, async (req, res) => {
     const { sailId } = req.params;
     const { status } = req.body;
     const userId = req.user ? req.user.id : 1;
@@ -78,8 +82,8 @@ module.exports = function(io) {
       res.status(400).json({ error: err.message });
     }
   });
-  
-  router.post('/revertLateSail/:sailId', async (req, res) => {
+
+  router.post('/revertLateSail/:sailId',attachIo, async (req, res) => {
     const { sailId } = req.params;
     const userId = req.user ? req.user.id : 1;
     try {

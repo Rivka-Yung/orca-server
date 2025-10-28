@@ -3,21 +3,54 @@ const { ZodError } = require('zod');
 const { findSailsWithOccupancy, getCustomerByPhoneNumber, addCustomer, insertNewBooking, findSailByDetails, createNewSail, createOrderInTransaction } = require('../storage/sql');
 
 //עזר
-function isSailAvailable(sail, newBooking) {
+// function isSailAvailable(sail, newBooking) {
 
+//     const activity_capacity = sail.activity_capacity ?? Infinity;
+
+//     const sail_capacity = sail.sail_capacity ?? Infinity;
+
+//     const free_places_activity = activity_capacity - sail.current_activity_occupancy;
+//     const free_places_sail = sail_capacity - sail.current_sail_occupancy;
+
+//     // console.log(`Checking sail ${sail.sail_id}: 
+//     //     Activity: ${activity_capacity} (capacity) - ${sail.current_activity_occupancy} (occupancy) >= ${newBooking.num_people_activity} (needed) -> ${free_places_activity >= newBooking.num_people_activity}
+//     //     Sail: ${sail_capacity} (capacity) - ${sail.current_sail_occupancy} (occupancy) >= ${newBooking.num_people_sail} (needed) -> ${free_places_sail >= newBooking.num_people_sail}`);
+//     // if (free_places_activity > free_places_sail)
+//     //     free_places_activity = free_places_sail;
+//     return free_places_activity >= newBooking.num_people_activity && free_places_sail >= newBooking.num_people_sail;
+// }
+
+
+function isSailAvailable(sail, newBooking) {
+    // ---- הגדרת משתנים ----
+    const sail_capacity = sail.sail_capacity ?? Infinity;
     const activity_capacity = sail.activity_capacity ?? Infinity;
 
-    const sail_capacity = sail.sail_capacity ?? Infinity;
+    const current_activity_occupancy = sail.current_activity_occupancy;
+    const current_sail_occupancy = sail.current_sail_occupancy;
+    const current_total_occupancy_on_boat = current_activity_occupancy + current_sail_occupancy;
 
-    const free_places_activity = activity_capacity - sail.current_activity_occupancy;
-    const free_places_sail = sail_capacity - sail.current_sail_occupancy;
+    const requested_activity = newBooking.num_people_activity;
+    const requested_sail = newBooking.num_people_sail;
+    const total_requested = requested_activity + requested_sail;
 
-    // console.log(`Checking sail ${sail.sail_id}: 
-    //     Activity: ${activity_capacity} (capacity) - ${sail.current_activity_occupancy} (occupancy) >= ${newBooking.num_people_activity} (needed) -> ${free_places_activity >= newBooking.num_people_activity}
-    //     Sail: ${sail_capacity} (capacity) - ${sail.current_sail_occupancy} (occupancy) >= ${newBooking.num_people_sail} (needed) -> ${free_places_sail >= newBooking.num_people_sail}`);
-    // if (free_places_activity > free_places_sail)
-    //     free_places_activity = free_places_sail;
-    return free_places_activity >= newBooking.num_people_activity && free_places_sail >= newBooking.num_people_sail;
+    // ---- בדיקת התנאים ----
+
+    // תנאי 1: האם התפוסה העתידית בפעילות חורגת מקיבולת הפעילות?
+    const future_activity_occupancy = current_activity_occupancy + requested_activity;
+    const is_activity_ok = future_activity_occupancy <= activity_capacity;
+
+    // תנאי 2: האם התפוסה העתידית בסירה חורגת מקיבולת הסירה?
+    const future_total_occupancy_on_boat = current_total_occupancy_on_boat + total_requested;
+    const is_sail_ok = future_total_occupancy_on_boat <= sail_capacity;
+
+    // הדפסה לדיבוג נשארת שימושית לבדיקות
+    console.log(`Checking sail ${sail.sail_id}:
+        - Activity Check: Future occupancy (${future_activity_occupancy}) <= Capacity (${activity_capacity}) -> ${is_activity_ok}
+        - Boat Check: Future occupancy (${future_total_occupancy_on_boat}) <= Capacity (${sail_capacity}) -> ${is_sail_ok}`);
+
+    // ההזמנה תקינה רק אם שני התנאים מתקיימים
+    return is_activity_ok && is_sail_ok;
 }
 
 const checkAvailability = async (req, res, next) => {

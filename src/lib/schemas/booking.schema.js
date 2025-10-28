@@ -52,7 +52,8 @@ const customerDataSchema = z.object({
 
   phone_number: z.string({
     required_error: 'Phone number is a required field.'
-  }).regex(/^05\d{8}$/, "Phone number must be 10 digits starting with 05"),
+  }).regex(/^(?:\+972|0)(?:[23489]|5[0-9]|7[2-9])[0-9]{7}$/, "מספר הטלפון אינו תקין"),
+
 
   wants_whatsapp: z.boolean().optional().default(false),
 
